@@ -2,14 +2,15 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import axios from "axios";
-import * as admin from "firebase-admin";
+import { initializeApp } from "firebase-admin/app";
+import { getFirestore, FieldValue, Timestamp } from "firebase-admin/firestore";
 
 // Initialize Firebase Admin
-admin.initializeApp({
+initializeApp({
   projectId: "gen-lang-client-0427603627" // Using projectId from config
 });
 
-const db = admin.firestore();
+const db = getFirestore();
 
 async function startServer() {
   const app = express();
@@ -44,7 +45,7 @@ async function startServer() {
         
         // Deduct balance
         batch.update(userRef, {
-          balance: admin.firestore.FieldValue.increment(-totalPrice)
+          balance: FieldValue.increment(-totalPrice)
         });
 
         // Create transaction record
@@ -55,7 +56,7 @@ async function startServer() {
           type: "purchase",
           status: "success",
           description: `Mua ${numProxy} Proxy - ${soNgay} ngày`,
-          createdAt: admin.firestore.FieldValue.serverTimestamp()
+          createdAt: FieldValue.serverTimestamp()
         });
 
         // Create proxy assets (mocking IP/Port if API doesn't return them directly in a standard way)
@@ -72,8 +73,8 @@ async function startServer() {
             username: usernameproxy,
             password: passwordproxy,
             type: tinhtrangproxy,
-            expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
-            createdAt: admin.firestore.FieldValue.serverTimestamp()
+            expiresAt: Timestamp.fromDate(expiresAt),
+            createdAt: FieldValue.serverTimestamp()
           });
         }
 
