@@ -818,7 +818,7 @@ export default function App() {
                       { label: 'Ngân hàng', value: 'MB BANK (Quân Đội)', field: 'Ngân hàng' },
                       { label: 'Số tài khoản', value: '0355656730', field: 'Số tài khoản' },
                       { label: 'Chủ tài khoản', value: 'NGUYEN GIA HUY', field: 'Chủ tài khoản' },
-                      { label: 'Nội dung', value: `PROXY ${profile?.email?.split('@')[0]}`, field: 'Nội dung' },
+                      { label: 'Nội dung', value: `NAP ${profile?.id?.substring(0, 8).toUpperCase()}`, field: 'Nội dung' },
                     ].map((item, i) => (
                       <div key={i} className="flex flex-col sm:flex-row sm:items-center justify-between py-3 border-b border-white/5 gap-2">
                         <span className="text-sm text-slate-400">{item.label}:</span>

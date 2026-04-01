@@ -90,7 +90,7 @@ async function startServer() {
       let val = curr.value;
       if (val === 'true') val = true;
       else if (val === 'false') val = false;
-      else if (curr.key === 'priceMarkup') val = parseFloat(val) || 0;
+      else if (['priceMarkup', 'basePrice', 'rotatingSurcharge'].includes(curr.key)) val = parseFloat(val) || 0;
       acc[curr.key] = val;
       return acc;
     }, {});
@@ -119,13 +119,89 @@ async function startServer() {
     if (req.user.role !== 'admin') return res.sendStatus(403);
     const updates = req.body;
     try {
-      const updateStmt = db.prepare('UPDATE settings SET value = ? WHERE key = ?');
+      const updateStmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
       for (const [key, value] of Object.entries(updates)) {
-        updateStmt.run(value?.toString(), key);
+        if (value !== undefined && value !== null) {
+          updateStmt.run(key, value.toString());
+        }
       }
       res.json({ status: "success" });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Bank API Polling
+  const BANK_PASSWORD = process.env.BANK_PASSWORD || "Giahuy@123";
+  const BANK_ACCOUNT = process.env.BANK_ACCOUNT || "0355656730";
+  const BANK_TOKEN = process.env.BANK_TOKEN || "48E1EDB4-347A-24C0-A43B-43B5201CF8E3";
+
+  const checkBankHistory = async () => {
+    try {
+      const response = await axios.get(`https://api.web2m.com/historyapimb/${BANK_PASSWORD}/${BANK_ACCOUNT}/${BANK_TOKEN}`);
+      if (response.data.success && response.data.data) {
+        for (const tx of response.data.data) {
+          const amount = parseFloat(tx.creditAmount);
+          if (amount > 0) {
+            const description = tx.description.toUpperCase();
+            // Match "NAP <userId_first_8>"
+            const match = description.match(/NAP\s+([A-Z0-9]{8})/);
+            if (match) {
+              const shortId = match[1];
+              // Find user with this shortId (first 8 chars of UUID)
+              const user: any = db.prepare('SELECT id FROM users WHERE id LIKE ?').get(`${shortId}%`);
+              if (user) {
+                // Check if this transaction refNo was already processed
+                const existingTx = db.prepare('SELECT id FROM transactions WHERE description LIKE ? AND status = ?').get(`%${tx.refNo}%`, 'success');
+                if (!existingTx) {
+                  db.transaction(() => {
+                    const txId = uuidv4();
+                    db.prepare('INSERT INTO transactions (id, userId, amount, type, status, description) VALUES (?, ?, ?, ?, ?, ?)')
+                      .run(txId, user.id, amount, 'deposit', 'success', `Nạp tiền tự động (Bank): ${amount.toLocaleString()}đ - Ref: ${tx.refNo}`);
+                    db.prepare('UPDATE users SET balance = balance + ? WHERE id = ?').run(amount, user.id);
+                  })();
+                  console.log(`Auto-approved deposit for user ${user.id}: ${amount}đ`);
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (error: any) {
+      console.error("Bank API Error:", error.message);
+    }
+  };
+
+  setInterval(checkBankHistory, 60000); // Check every minute
+
+  // Web-triggerable cron endpoint
+  app.get("/api/cron/bank", async (req, res) => {
+    try {
+      await checkBankHistory();
+      res.json({ status: "success", message: "Bank history check triggered" });
+    } catch (error: any) {
+      res.status(500).json({ status: "error", message: error.message });
+    }
+  });
+
+  // Serve cron.php as a trigger (even if it's just Node.js behind it)
+  app.get("/cron.php", async (req, res) => {
+    try {
+      await checkBankHistory();
+      res.send(`
+        <html>
+          <body style="font-family: sans-serif; padding: 20px; background: #121214; color: #fff;">
+            <h2 style="color: #6366f1;">--- Đang bắt đầu kiểm tra lịch sử ngân hàng ---</h2>
+            <p><strong>Trạng thái:</strong> Thành công</p>
+            <p><strong>Thời gian:</strong> ${new Date().toLocaleString('vi-VN')}</p>
+            <p>Hệ thống đã kiểm tra và tự động duyệt các giao dịch nạp tiền khớp nội dung.</p>
+            <hr style="border: 0; border-top: 1px solid #333; margin: 20px 0;">
+            <p style="color: #666; font-size: 12px;">© 2026 PROXYPRO. All rights reserved.</p>
+          </body>
+        </html>
+      `);
+    } catch (error: any) {
+      res.status(500).send(`Lỗi: ${error.message}`);
     }
   });
 
