@@ -181,9 +181,9 @@ async function startServer() {
       const apiResponse = await axios.post("https://proxynuoinick.com/api/api/tasks/start", {
         userId: "0355656730",
         numProxy: parseInt(numProxy),
-        passwordproxy: passwordproxy,
-        usernameproxy: usernameproxy,
-        tinhtrangproxy: tinhtrangproxy,
+        passwordproxy: passwordproxy || "0355656730",
+        usernameproxy: usernameproxy || "0355656730",
+        tinhtrangproxy: tinhtrangproxy || "Không xoay",
         thoigianxoay: 0,
         soNgay: parseInt(soNgay),
         tenKhach: "0355656730"
