@@ -1,0 +1,78 @@
+{
+  "entities": {
+    "users": {
+      "title": "User Profile",
+      "description": "Stores user balance and basic profile information.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "balance": { "type": "number", "description": "User's current balance in VND" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "balance"]
+    },
+    "transactions": {
+      "title": "Transaction History",
+      "description": "Stores deposit and purchase history.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "type": { "type": "string", "enum": ["deposit", "purchase"] },
+        "status": { "type": "string", "enum": ["pending", "success", "failed"] },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "amount", "type", "status", "createdAt"]
+    },
+    "settings": {
+      "title": "Global Settings",
+      "description": "Stores global configuration like price markup and announcements.",
+      "type": "object",
+      "properties": {
+        "priceMarkup": { "type": "number", "description": "Percentage to increase price (e.g., 10 for 10%)" },
+        "announcement": { "type": "string", "description": "Text for the global announcement popup" },
+        "showAnnouncement": { "type": "boolean" },
+        "contactEmail": { "type": "string" },
+        "contactTelegram": { "type": "string" },
+        "contactPhone": { "type": "string" }
+      }
+    },
+    "proxies": {
+      "title": "Proxy Asset",
+      "description": "Stores details of purchased proxies.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "ip": { "type": "string" },
+        "port": { "type": "number" },
+        "username": { "type": "string" },
+        "password": { "type": "string" },
+        "type": { "type": "string" },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "ip", "port", "username", "password", "type", "expiresAt", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "users",
+      "description": "User profile document"
+    },
+    "/transactions/{transactionId}": {
+      "schema": "transactions",
+      "description": "Transaction record"
+    },
+    "/settings/global": {
+      "schema": "settings",
+      "description": "Global application settings"
+    },
+    "/proxies/{proxyId}": {
+      "schema": "proxies",
+      "description": "Purchased proxy details"
+    }
+  }
+}
