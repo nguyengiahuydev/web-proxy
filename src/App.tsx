@@ -416,7 +416,7 @@ export default function App() {
           - Telegram: ${globalSettings.contactTelegram}
           - Phone: ${globalSettings.contactPhone}
           
-          Hướng dẫn nạp tiền: Người dùng chuyển khoản qua MB Bank (0813149999) với nội dung "PROXY [tên tài khoản]".
+          Hướng dẫn nạp tiền: Người dùng chuyển khoản qua MB Bank (0355656730 ) với nội dung "PROXY [tên tài khoản]".
           
           Hãy trả lời bằng tiếng Việt, phong cách chuyên nghiệp, thân thiện và ngắn gọn. Nếu không biết câu trả lời, hãy hướng dẫn khách hàng liên hệ qua Telegram ${globalSettings.contactTelegram}.
           
