@@ -9,6 +9,7 @@
         "email": { "type": "string" },
         "displayName": { "type": "string" },
         "balance": { "type": "number", "description": "User's current balance in VND" },
+        "discount": { "type": "number", "description": "Percentage discount for this user (0-100)" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["uid", "email", "balance"]

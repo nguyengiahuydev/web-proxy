@@ -81,6 +81,7 @@ interface UserProfile {
   email: string;
   displayName: string;
   balance: number;
+  discount?: number; // Percentage discount for this specific user
   createdAt: any;
 }
 
@@ -140,6 +141,8 @@ export default function App() {
   const [txFilter, setTxFilter] = useState<'all' | 'deposit' | 'purchase'>('all');
   const [allProxies, setAllProxies] = useState<any[]>([]);
   const [showAnnouncementPopup, setShowAnnouncementPopup] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
+  const [isEditUserModalOpen, setIsEditUserModalOpen] = useState(false);
 
   // AI Chat State
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -284,10 +287,17 @@ export default function App() {
     if (formData.tinhtrangproxy === 'Xoay') {
       base += formData.numProxy * ROTATING_SURCHARGE;
     }
-    // Apply Markup
+    // Apply Global Markup
     const markupAmount = (base * (globalSettings.priceMarkup || 0)) / 100;
-    return base + markupAmount;
-  }, [formData, globalSettings.priceMarkup]);
+    let finalPrice = base + markupAmount;
+
+    // Apply User-specific Discount
+    if (profile?.discount && profile.discount > 0) {
+      finalPrice = finalPrice * (1 - profile.discount / 100);
+    }
+
+    return finalPrice;
+  }, [formData, globalSettings.priceMarkup, profile?.discount]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -424,6 +434,17 @@ export default function App() {
     try {
       await updateDoc(doc(db, 'users', userId), { balance: newBalance });
       toast.success('Cập nhật số dư thành công!');
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
+
+  const handleUpdateUserProfile = async (userId: string, data: Partial<UserProfile>) => {
+    if (!isAdmin) return;
+    try {
+      await updateDoc(doc(db, 'users', userId), data);
+      toast.success('Cập nhật thông tin người dùng thành công!');
+      setIsEditUserModalOpen(false);
     } catch (err: any) {
       toast.error(err.message);
     }
@@ -1176,17 +1197,23 @@ export default function App() {
                                   <div className="text-xs text-slate-500">{u.email}</div>
                                   <div className="text-[10px] text-slate-600 font-mono mt-1">{u.uid}</div>
                                 </td>
-                                <td className="py-4 px-4 font-bold text-indigo-400">{u.balance.toLocaleString('vi-VN')}đ</td>
+                                <td className="py-4 px-4 font-bold text-indigo-400">
+                                  {u.balance.toLocaleString('vi-VN')}đ
+                                  {u.discount && u.discount > 0 && (
+                                    <div className="text-[10px] text-emerald-400 font-bold">Giảm giá: {u.discount}%</div>
+                                  )}
+                                </td>
                                 <td className="py-4 px-4 text-slate-500 text-xs">{u.createdAt?.toDate().toLocaleDateString('vi-VN')}</td>
                                 <td className="py-4 px-4">
                                   <button 
                                     onClick={() => {
-                                      const amount = prompt('Nhập số dư mới cho người dùng:', u.balance.toString());
-                                      if (amount !== null) handleUpdateUserBalance(u.uid, parseInt(amount) || 0);
+                                      setEditingUser(u);
+                                      setIsEditUserModalOpen(true);
                                     }}
-                                    className="p-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-slate-400 hover:text-white transition-all"
+                                    className="p-2 bg-indigo-600/10 hover:bg-indigo-600/20 border border-indigo-500/20 rounded-lg text-indigo-400 hover:text-indigo-300 transition-all flex items-center gap-2"
                                   >
                                     <Settings className="w-4 h-4" />
+                                    <span className="text-xs font-bold">Chỉnh sửa</span>
                                   </button>
                                 </td>
                               </tr>
@@ -1345,6 +1372,123 @@ export default function App() {
           </div>
         </div>
       </footer>
+
+      {/* Edit User Modal */}
+      <AnimatePresence>
+        {isEditUserModalOpen && editingUser && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="w-full max-w-md bg-[#121214] border border-white/10 rounded-[32px] p-8 shadow-2xl relative overflow-hidden"
+            >
+              <div className="absolute top-0 left-0 w-full h-2 bg-indigo-600" />
+              <button 
+                onClick={() => setIsEditUserModalOpen(false)}
+                className="absolute top-6 right-6 p-2 hover:bg-white/5 rounded-xl transition-colors text-slate-500 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              
+              <div className="space-y-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-indigo-600/10 rounded-xl flex items-center justify-center text-indigo-500">
+                    <User className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-white">Chỉnh sửa người dùng</h2>
+                    <p className="text-xs text-slate-500">{editingUser.email}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tên hiển thị</label>
+                    <input 
+                      type="text" 
+                      defaultValue={editingUser.displayName}
+                      id="edit-displayName"
+                      className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:border-indigo-500 outline-none transition-all text-white text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Số dư (VND)</label>
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="number" 
+                        defaultValue={editingUser.balance}
+                        id="edit-balance"
+                        className="flex-1 px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:border-indigo-500 outline-none transition-all text-white text-sm"
+                      />
+                      <div className="flex flex-col gap-1">
+                        <button 
+                          onClick={() => {
+                            const val = prompt('Số tiền muốn cộng:');
+                            if (val) {
+                              const input = document.getElementById('edit-balance') as HTMLInputElement;
+                              input.value = (parseInt(input.value) + parseInt(val)).toString();
+                            }
+                          }}
+                          className="px-2 py-1 bg-emerald-500/10 text-emerald-400 rounded-md text-[10px] font-bold hover:bg-emerald-500/20"
+                        >
+                          + Cộng
+                        </button>
+                        <button 
+                          onClick={() => {
+                            const val = prompt('Số tiền muốn trừ:');
+                            if (val) {
+                              const input = document.getElementById('edit-balance') as HTMLInputElement;
+                              input.value = (parseInt(input.value) - parseInt(val)).toString();
+                            }
+                          }}
+                          className="px-2 py-1 bg-rose-500/10 text-rose-400 rounded-md text-[10px] font-bold hover:bg-rose-500/20"
+                        >
+                          - Trừ
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Giảm giá (%)</label>
+                    <input 
+                      type="number" 
+                      min="0"
+                      max="100"
+                      defaultValue={editingUser.discount || 0}
+                      id="edit-discount"
+                      className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:border-indigo-500 outline-none transition-all text-white text-sm"
+                    />
+                    <p className="text-[10px] text-slate-500 italic">* Giảm giá trực tiếp cho mọi đơn hàng của user này.</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button 
+                    onClick={() => setIsEditUserModalOpen(false)}
+                    className="flex-1 py-3.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl font-bold transition-all"
+                  >
+                    Hủy
+                  </button>
+                  <button 
+                    onClick={() => {
+                      const displayName = (document.getElementById('edit-displayName') as HTMLInputElement).value;
+                      const balance = parseInt((document.getElementById('edit-balance') as HTMLInputElement).value) || 0;
+                      const discount = parseInt((document.getElementById('edit-discount') as HTMLInputElement).value) || 0;
+                      handleUpdateUserProfile(editingUser.uid, { displayName, balance, discount });
+                    }}
+                    className="flex-1 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-all shadow-lg shadow-indigo-600/20"
+                  >
+                    Lưu thay đổi
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Announcement Popup */}
       <AnimatePresence>
