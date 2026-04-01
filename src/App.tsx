@@ -47,8 +47,6 @@ import { GoogleGenAI } from "@google/genai";
 import { Toaster, toast } from 'sonner';
 
 // Configuration
-const PROXY_PRICE_PER_DAY = 2000; 
-const ROTATING_SURCHARGE = 5000; 
 
 interface UserProfile {
   id: string;
@@ -84,6 +82,11 @@ interface ProxyAsset {
 
 interface GlobalSettings {
   priceMarkup: number;
+  basePrice: number;
+  rotatingSurcharge: number;
+  siteName: string;
+  siteLogo: string;
+  siteDescription: string;
   announcement: string;
   showAnnouncement: boolean;
   contactEmail: string;
@@ -103,6 +106,11 @@ export default function App() {
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [globalSettings, setGlobalSettings] = useState<GlobalSettings>({
     priceMarkup: 0,
+    basePrice: 2000,
+    rotatingSurcharge: 5000,
+    siteName: 'PROXYPRO',
+    siteLogo: '',
+    siteDescription: 'Giải pháp Proxy IPv4/IPv6 tốc độ cao, ổn định, không giới hạn băng thông.',
     announcement: '',
     showAnnouncement: false,
     contactEmail: '',
@@ -137,7 +145,7 @@ export default function App() {
   // AI Chat State
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    { role: 'model', text: 'Xin chào! Tôi là trợ lý AI của PROXYPRO. Tôi có thể giúp gì cho bạn?' }
+    { role: 'model', text: `Xin chào! Tôi là trợ lý AI của ${globalSettings.siteName || 'PROXYPRO'}. Tôi có thể giúp gì cho bạn?` }
   ]);
   const [chatInput, setChatInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
@@ -227,6 +235,22 @@ export default function App() {
     }
   }, [profile]);
 
+  useEffect(() => {
+    if (globalSettings.siteName) {
+      document.title = `${globalSettings.siteName} - ${globalSettings.siteDescription}`;
+      
+      // Update meta tags
+      const metaDescription = document.querySelector('meta[name="description"]');
+      if (metaDescription) metaDescription.setAttribute('content', globalSettings.siteDescription);
+      
+      const ogTitle = document.querySelector('meta[property="og:title"]');
+      if (ogTitle) ogTitle.setAttribute('content', globalSettings.siteName);
+      
+      const ogDescription = document.querySelector('meta[property="og:description"]');
+      if (ogDescription) ogDescription.setAttribute('content', globalSettings.siteDescription);
+    }
+  }, [globalSettings]);
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     setProfile(null);
@@ -235,9 +259,9 @@ export default function App() {
   };
 
   const totalPrice = useMemo(() => {
-    let base = formData.numProxy * formData.soNgay * PROXY_PRICE_PER_DAY;
+    let base = formData.numProxy * formData.soNgay * (globalSettings.basePrice || 2000);
     if (formData.tinhtrangproxy === 'Xoay') {
-      base += formData.numProxy * ROTATING_SURCHARGE;
+      base += formData.numProxy * (globalSettings.rotatingSurcharge || 5000);
     }
     // Apply Global Markup
     const markupAmount = (base * (globalSettings.priceMarkup || 0)) / 100;
@@ -408,7 +432,7 @@ export default function App() {
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: [
-          { role: 'user', parts: [{ text: `Bạn là trợ lý hỗ trợ khách hàng thông minh cho PROXYPRO.
+          { role: 'user', parts: [{ text: `Bạn là trợ lý hỗ trợ khách hàng thông minh cho ${globalSettings.siteName || 'PROXYPRO'}.
           Dịch vụ của chúng tôi cung cấp Proxy IPv4/IPv6 tốc độ cao, ổn định, không giới hạn băng thông.
           
           Thông tin liên hệ:
@@ -416,7 +440,7 @@ export default function App() {
           - Telegram: ${globalSettings.contactTelegram}
           - Phone: ${globalSettings.contactPhone}
           
-          Hướng dẫn nạp tiền: Người dùng chuyển khoản qua MB Bank (0355656730 ) với nội dung "PROXY [tên tài khoản]".
+          Hướng dẫn nạp tiền: Người dùng chuyển khoản qua MB Bank (0813149999) với nội dung "PROXY [tên tài khoản]".
           
           Hãy trả lời bằng tiếng Việt, phong cách chuyên nghiệp, thân thiện và ngắn gọn. Nếu không biết câu trả lời, hãy hướng dẫn khách hàng liên hệ qua Telegram ${globalSettings.contactTelegram}.
           
@@ -577,9 +601,13 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => setActiveTab('order')}>
             <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-600/20">
-              <Shield className="w-6 h-6 text-white" />
+              {globalSettings.siteLogo ? (
+                <img src={globalSettings.siteLogo} alt="Logo" className="w-6 h-6 object-contain" referrerPolicy="no-referrer" />
+              ) : (
+                <Shield className="w-6 h-6 text-white" />
+              )}
             </div>
-            <span className="text-xl font-bold tracking-tight text-white">PROXY<span className="text-indigo-500">PRO</span></span>
+            <span className="text-xl font-bold tracking-tight text-white">{globalSettings.siteName || 'PROXYPRO'}</span>
           </div>
           
           <div className="hidden md:flex items-center gap-6">
@@ -697,7 +725,7 @@ export default function App() {
                   <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="grid sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Số lượng Proxy</label>
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Số lượng Proxy IPv6</label>
                         <input required type="number" name="numProxy" min="1" value={formData.numProxy} onChange={handleInputChange} className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:border-indigo-500 outline-none transition-all text-white" />
                       </div>
                       <div className="space-y-2">
@@ -706,28 +734,15 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div className="grid sm:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Username Proxy</label>
-                        <input required type="text" name="usernameproxy" value={formData.usernameproxy} onChange={handleInputChange} className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:border-indigo-500 outline-none transition-all text-white" />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Password Proxy</label>
-                        <input required type="password" name="passwordproxy" value={formData.passwordproxy} onChange={handleInputChange} className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:border-indigo-500 outline-none transition-all text-white" />
-                      </div>
-                    </div>
-
-                    <div className="grid sm:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Loại Proxy</label>
-                        <select name="tinhtrangproxy" value={formData.tinhtrangproxy} onChange={handleInputChange} className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:border-indigo-500 outline-none transition-all appearance-none text-white">
-                          <option value="Không xoay">Tĩnh (Static)</option>
-                          <option value="Xoay">Xoay (Rotating)</option>
-                        </select>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Thời gian xoay (phút)</label>
-                        <input type="number" name="thoigianxoay" disabled={formData.tinhtrangproxy === 'Không xoay'} value={formData.thoigianxoay} onChange={handleInputChange} className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:border-indigo-500 outline-none transition-all disabled:opacity-30 text-white" />
+                    <div className="p-4 bg-indigo-500/5 border border-indigo-500/10 rounded-2xl">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-indigo-500/10 rounded-lg">
+                          <Globe className="w-4 h-4 text-indigo-400" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-white">Loại Proxy: IPv6</div>
+                          <div className="text-[10px] text-slate-500">Tốc độ cao, ổn định, không giới hạn băng thông</div>
+                        </div>
                       </div>
                     </div>
 
@@ -1199,7 +1214,57 @@ export default function App() {
                 )}
 
                 {adminSubTab === 'settings' && localSettings && (
-                  <div className="space-y-8 max-w-2xl">
+                  <div className="space-y-8 max-w-3xl">
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tên trang web</label>
+                        <input 
+                          type="text" 
+                          value={localSettings.siteName} 
+                          onChange={(e) => setLocalSettings({ ...localSettings, siteName: e.target.value })}
+                          className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:border-indigo-500 outline-none transition-all text-white text-sm" 
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Logo URL</label>
+                        <input 
+                          type="text" 
+                          value={localSettings.siteLogo} 
+                          onChange={(e) => setLocalSettings({ ...localSettings, siteLogo: e.target.value })}
+                          className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:border-indigo-500 outline-none transition-all text-white text-sm" 
+                          placeholder="https://..."
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Giá cơ bản (đ/ngày)</label>
+                        <input 
+                          type="number" 
+                          value={localSettings.basePrice} 
+                          onChange={(e) => setLocalSettings({ ...localSettings, basePrice: parseInt(e.target.value) || 0 })}
+                          className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:border-indigo-500 outline-none transition-all text-white text-sm" 
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Phụ phí xoay (đ/proxy)</label>
+                        <input 
+                          type="number" 
+                          value={localSettings.rotatingSurcharge} 
+                          onChange={(e) => setLocalSettings({ ...localSettings, rotatingSurcharge: parseInt(e.target.value) || 0 })}
+                          className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:border-indigo-500 outline-none transition-all text-white text-sm" 
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Mô tả trang web (SEO)</label>
+                      <input 
+                        type="text" 
+                        value={localSettings.siteDescription} 
+                        onChange={(e) => setLocalSettings({ ...localSettings, siteDescription: e.target.value })}
+                        className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:border-indigo-500 outline-none transition-all text-white text-sm" 
+                      />
+                    </div>
+
                     <div className="grid sm:grid-cols-2 gap-6">
                       <div className="space-y-2">
                         <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tăng giá (%)</label>
@@ -1290,12 +1355,16 @@ export default function App() {
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
-                <Shield className="w-5 h-5 text-white" />
+                {globalSettings.siteLogo ? (
+                  <img src={globalSettings.siteLogo} alt="Logo" className="w-5 h-5 object-contain" referrerPolicy="no-referrer" />
+                ) : (
+                  <Shield className="w-5 h-5 text-white" />
+                )}
               </div>
-              <span className="text-lg font-bold text-white">PROXYPRO</span>
+              <span className="text-lg font-bold text-white">{globalSettings.siteName || 'PROXYPRO'}</span>
             </div>
             <p className="text-sm text-slate-500 leading-relaxed">
-              Giải pháp Proxy hàng đầu Việt Nam. Chất lượng, ổn định và bảo mật tuyệt đối.
+              {globalSettings.siteDescription}
             </p>
           </div>
           
@@ -1343,7 +1412,7 @@ export default function App() {
           </div>
         </div>
         <div className="max-w-7xl mx-auto px-6 pt-12 mt-12 border-t border-white/5 flex flex-col sm:flex-row justify-between items-center gap-4">
-          <p className="text-xs text-slate-600">© 2026 PROXYPRO. All rights reserved.</p>
+          <p className="text-xs text-slate-600">© 2026 {globalSettings.siteName || 'PROXYPRO'}. All rights reserved.</p>
         </div>
       </footer>
 

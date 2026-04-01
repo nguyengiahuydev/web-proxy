@@ -50,6 +50,11 @@ db.exec(`
 // Seed default settings
 const seedSettings = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
 seedSettings.run('priceMarkup', '0');
+seedSettings.run('basePrice', '2000');
+seedSettings.run('rotatingSurcharge', '5000');
+seedSettings.run('siteName', 'PROXYPRO');
+seedSettings.run('siteLogo', '');
+seedSettings.run('siteDescription', 'Giải pháp Proxy IPv4/IPv6 tốc độ cao, ổn định, không giới hạn băng thông.');
 seedSettings.run('announcement', 'Chào mừng bạn đến với hệ thống Proxy chất lượng cao!');
 seedSettings.run('showAnnouncement', 'false');
 seedSettings.run('contactEmail', 'support@proxypro.vn');
