@@ -44,32 +44,6 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import axios from 'axios';
 import { GoogleGenAI } from "@google/genai";
-import { 
-  signInWithPopup, 
-  GoogleAuthProvider, 
-  signOut, 
-  onAuthStateChanged,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  User as FirebaseUser
-} from 'firebase/auth';
-import { 
-  doc, 
-  getDoc, 
-  setDoc, 
-  onSnapshot, 
-  collection, 
-  query, 
-  where, 
-  orderBy, 
-  addDoc,
-  updateDoc,
-  serverTimestamp,
-  Timestamp,
-  getDocs,
-  limit
-} from 'firebase/firestore';
-import { auth, db } from './firebase';
 import { Toaster, toast } from 'sonner';
 
 // Configuration
@@ -77,12 +51,13 @@ const PROXY_PRICE_PER_DAY = 2000;
 const ROTATING_SURCHARGE = 5000; 
 
 interface UserProfile {
-  uid: string;
+  id: string;
   email: string;
   displayName: string;
   balance: number;
-  discount?: number; // Percentage discount for this specific user
-  createdAt: any;
+  discount?: number;
+  role: 'user' | 'admin';
+  createdAt: string;
 }
 
 interface Transaction {
@@ -92,7 +67,19 @@ interface Transaction {
   type: 'deposit' | 'purchase';
   status: 'pending' | 'success' | 'failed';
   description: string;
-  createdAt: Timestamp;
+  createdAt: string;
+}
+
+interface ProxyAsset {
+  id: string;
+  userId: string;
+  ip: string;
+  port: number;
+  username?: string;
+  password?: string;
+  type: string;
+  expiresAt: string;
+  createdAt: string;
 }
 
 interface GlobalSettings {
@@ -110,7 +97,6 @@ interface ChatMessage {
 }
 
 export default function App() {
-  const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [allPendingTransactions, setAllPendingTransactions] = useState<Transaction[]>([]);
@@ -123,9 +109,10 @@ export default function App() {
     contactTelegram: '',
     contactPhone: ''
   });
-  const [authMode, setAuthMode] = useState<'login' | 'register' | 'none'>('none');
+  const [authMode, setAuthMode] = useState<'login' | 'register' | 'none'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [activeTab, setActiveTab] = useState<'order' | 'deposit' | 'history' | 'admin'>('order');
   const [adminSubTab, setAdminSubTab] = useState<'dashboard' | 'transactions' | 'users' | 'settings'>('dashboard');
@@ -166,121 +153,81 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
 
-  const isAdmin = useMemo(() => user?.email === 'huynofa@gmail.com', [user]);
+  const isAdmin = useMemo(() => profile?.role === 'admin', [profile]);
 
-  // Auth Listener
+  const api = axios.create({
+    baseURL: '/api',
+  });
+
+  api.interceptors.request.use((config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  });
+
+  const fetchProfile = async () => {
+    try {
+      const res = await api.get('/user/profile');
+      setProfile(res.data);
+      setFormData(prev => ({ ...prev, userId: res.data.id, tenKhach: res.data.displayName }));
+    } catch (err) {
+      handleLogout();
+    }
+  };
+
+  const fetchData = async () => {
+    if (!localStorage.getItem('token')) return;
+    try {
+      const [txRes, proxyRes, settingsRes] = await Promise.all([
+        api.get('/user/transactions'),
+        api.get('/user/proxies'),
+        api.get('/settings')
+      ]);
+      setTransactions(txRes.data);
+      setAllProxies(proxyRes.data);
+      setGlobalSettings(settingsRes.data);
+      
+      if (settingsRes.data.announcement) {
+        setShowAnnouncementPopup(true);
+      }
+
+      if (profile?.role === 'admin') {
+        const usersRes = await api.get('/admin/users');
+        setAllUsers(usersRes.data);
+        const totalBal = usersRes.data.reduce((acc: number, u: any) => acc + (u.balance || 0), 0);
+        setStats(prev => ({ ...prev, totalUsers: usersRes.data.length, totalBalance: totalBal }));
+      }
+    } catch (err) {
+      console.error("Fetch error", err);
+    }
+  };
+
   useEffect(() => {
-    // Listen to Global Settings
-    const settingsRef = doc(db, 'settings', 'global');
-    const unsubSettings = onSnapshot(settingsRef, async (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data() as GlobalSettings;
-        setGlobalSettings(data);
-        if (data.showAnnouncement && data.announcement) {
-          setShowAnnouncementPopup(true);
-        }
-      } else if (isAdmin) {
-        // Initialize settings if admin and they don't exist
-        const initialSettings: GlobalSettings = {
-          priceMarkup: 0,
-          announcement: 'Chào mừng bạn đến với PROXYPRO!',
-          showAnnouncement: true,
-          contactEmail: 'support@proxypro.com',
-          contactTelegram: '@proxypro_support',
-          contactPhone: '0123456789'
-        };
-        await setDoc(settingsRef, initialSettings);
-      }
-    });
-
-    const unsubscribe = onAuthStateChanged(auth, async (u) => {
-      setUser(u);
-      if (u) {
-        setAuthMode('none');
-        // Initialize/Fetch Profile
-        const userRef = doc(db, 'users', u.uid);
-        const userSnap = await getDoc(userRef);
-        
-        if (!userSnap.exists()) {
-          const newProfile = {
-            uid: u.uid,
-            email: u.email || '',
-            displayName: u.displayName || u.email?.split('@')[0] || 'User',
-            balance: 0,
-            createdAt: serverTimestamp()
-          };
-          await setDoc(userRef, newProfile);
-        }
-
-        // Listen to Profile Changes
-        onSnapshot(userRef, (doc) => {
-          setProfile(doc.data() as UserProfile);
-        });
-
-        // Listen to User Transactions
-        const q = query(
-          collection(db, 'transactions'), 
-          where('userId', '==', u.uid),
-          orderBy('createdAt', 'desc')
-        );
-        onSnapshot(q, (snapshot) => {
-          setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction)));
-        });
-
-        // Listen to User's Proxies
-        const proxiesQ = query(collection(db, 'proxies'), where('userId', '==', u.uid), orderBy('createdAt', 'desc'));
-        onSnapshot(proxiesQ, (snapshot) => {
-          setAllProxies(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        });
-
-        // Pre-fill form
-        setFormData(prev => ({
-          ...prev,
-          userId: u.uid,
-          tenKhach: u.displayName || u.email?.split('@')[0] || ''
-        }));
-
-        // If admin, listen to all pending transactions and all users
-        if (u.email === 'huynofa@gmail.com') {
-          const pendingQ = query(
-            collection(db, 'transactions'),
-            where('status', '==', 'pending'),
-            orderBy('createdAt', 'desc')
-          );
-          onSnapshot(pendingQ, (snapshot) => {
-            setAllPendingTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction)));
-          });
-
-          const usersQ = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
-          onSnapshot(usersQ, (snapshot) => {
-            const users = snapshot.docs.map(doc => doc.data() as UserProfile);
-            setAllUsers(users);
-            
-            // Calculate Stats
-            const totalBal = users.reduce((acc, u) => acc + (u.balance || 0), 0);
-            setStats(prev => ({ ...prev, totalUsers: users.length, totalBalance: totalBal }));
-          });
-
-          // Listen to all transactions for stats
-          const allTxQ = query(collection(db, 'transactions'));
-          onSnapshot(allTxQ, (snapshot) => {
-            const txs = snapshot.docs.map(doc => doc.data() as Transaction);
-            const pending = txs.filter(t => t.type === 'deposit' && t.status === 'pending').length;
-            const purchases = txs.filter(t => t.type === 'purchase').length;
-            setStats(prev => ({ ...prev, pendingDeposits: pending, totalPurchases: purchases }));
-          });
-        }
-      } else {
-        setProfile(null);
-        setTransactions([]);
-        setAuthMode('login');
-      }
-    });
-    return () => {
-      unsubscribe();
-      unsubSettings();
-    };
+    const token = localStorage.getItem('token');
+    if (token) {
+      setAuthMode('none');
+      fetchProfile();
+    } else {
+      setAuthMode('login');
+    }
   }, []);
+
+  useEffect(() => {
+    if (profile) {
+      fetchData();
+      const interval = setInterval(fetchData, 10000); // Poll every 10s
+      return () => clearInterval(interval);
+    }
+  }, [profile]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    setProfile(null);
+    setAuthMode('login');
+    toast.success('Đã đăng xuất!');
+  };
 
   const totalPrice = useMemo(() => {
     let base = formData.numProxy * formData.soNgay * PROXY_PRICE_PER_DAY;
@@ -311,7 +258,7 @@ export default function App() {
     return allUsers.filter(u => 
       u.email.toLowerCase().includes(userSearch.toLowerCase()) || 
       u.displayName.toLowerCase().includes(userSearch.toLowerCase()) ||
-      u.uid.toLowerCase().includes(userSearch.toLowerCase())
+      u.id.toLowerCase().includes(userSearch.toLowerCase())
     );
   }, [allUsers, userSearch]);
 
@@ -330,40 +277,20 @@ export default function App() {
     setStatus(null);
     try {
       if (authMode === 'register') {
-        await createUserWithEmailAndPassword(auth, email, password);
+        const res = await api.post('/auth/register', { email, password, displayName });
+        localStorage.setItem('token', res.data.token);
+        setProfile(res.data.user);
         toast.success('Đăng ký tài khoản thành công!');
       } else {
-        await signInWithEmailAndPassword(auth, email, password);
+        const res = await api.post('/auth/login', { email, password });
+        localStorage.setItem('token', res.data.token);
+        setProfile(res.data.user);
         toast.success('Đăng nhập thành công!');
       }
+      setAuthMode('none');
+      fetchData();
     } catch (err: any) {
-      let errorMessage = 'Đã có lỗi xảy ra. Vui lòng thử lại.';
-      
-      switch (err.code) {
-        case 'auth/email-already-in-use':
-          errorMessage = 'Email này đã được sử dụng bởi một tài khoản khác.';
-          break;
-        case 'auth/invalid-email':
-          errorMessage = 'Địa chỉ email không hợp lệ.';
-          break;
-        case 'auth/weak-password':
-          errorMessage = 'Mật khẩu quá yếu (tối thiểu 6 ký tự).';
-          break;
-        case 'auth/user-not-found':
-        case 'auth/wrong-password':
-        case 'auth/invalid-credential':
-          errorMessage = 'Email hoặc mật khẩu không chính xác.';
-          break;
-        case 'auth/too-many-requests':
-          errorMessage = 'Tài khoản đã bị tạm khóa do đăng nhập sai nhiều lần. Vui lòng thử lại sau.';
-          break;
-        case 'auth/operation-not-allowed':
-          errorMessage = 'Phương thức đăng nhập này chưa được bật trong Firebase Console.';
-          break;
-        default:
-          errorMessage = err.message || errorMessage;
-      }
-
+      const errorMessage = err.response?.data?.error || 'Đã có lỗi xảy ra. Vui lòng thử lại.';
       toast.error(errorMessage);
       setStatus({ type: 'error', msg: errorMessage });
     } finally {
@@ -371,41 +298,20 @@ export default function App() {
     }
   };
 
-  const handleGoogleLogin = async () => {
-    try {
-      await signInWithPopup(auth, new GoogleAuthProvider());
-      toast.success('Đăng nhập bằng Google thành công!');
-    } catch (err: any) {
-      let errorMessage = 'Đã có lỗi xảy ra khi đăng nhập bằng Google.';
-      if (err.code === 'auth/popup-closed-by-user') {
-        errorMessage = 'Cửa sổ đăng nhập đã bị đóng.';
-      } else if (err.code === 'auth/cancelled-popup-request') {
-        errorMessage = 'Yêu cầu đăng nhập đã bị hủy.';
-      } else if (err.code === 'auth/operation-not-allowed') {
-        errorMessage = 'Đăng nhập bằng Google chưa được bật trong Firebase Console.';
-      }
-      toast.error(errorMessage);
-      setStatus({ type: 'error', msg: errorMessage });
-    }
+  const handleGoogleLogin = () => {
+    toast.error('Đăng nhập Google hiện không khả dụng với hệ thống SQLite. Vui lòng sử dụng Email/Mật khẩu.');
   };
 
   const handleDeposit = async (amount: number) => {
-    if (!user) return;
     setLoading(true);
     try {
-      await addDoc(collection(db, 'transactions'), {
-        userId: user.uid,
-        amount,
-        type: 'deposit',
-        status: 'pending',
-        description: `Nạp ${amount.toLocaleString('vi-VN')}đ qua chuyển khoản`,
-        createdAt: serverTimestamp()
-      });
+      await api.post('/deposit', { amount });
       toast.success('Yêu cầu nạp tiền đã được gửi. Vui lòng chuyển khoản theo hướng dẫn.');
       setStatus({ type: 'success', msg: 'Yêu cầu nạp tiền đã được gửi. Vui lòng chuyển khoản theo nội dung hướng dẫn.' });
+      fetchData();
+      fetchProfile();
     } catch (err: any) {
-      toast.error(err.message);
-      setStatus({ type: 'error', msg: err.message });
+      toast.error(err.response?.data?.error || err.message);
     } finally {
       setLoading(false);
     }
@@ -415,83 +321,62 @@ export default function App() {
     e.preventDefault();
     if (!profile || profile.balance < totalPrice) {
       toast.error('Số dư không đủ. Vui lòng nạp thêm tiền.');
-      setStatus({ type: 'error', msg: 'Số dư không đủ. Vui lòng nạp thêm tiền.' });
       return;
     }
 
     setLoading(true);
-    setStatus(null);
-
     try {
-      const response = await axios.post('/api/proxy/order', { ...formData, totalPrice });
-      if (response.data.status === 'success' || response.data.success) {
+      const response = await api.post('/proxy/order', { ...formData, totalPrice });
+      if (response.data.status === 'success') {
         toast.success('Đơn hàng đã được khởi tạo thành công!');
-        setStatus({ type: 'success', msg: 'Đơn hàng đã được khởi tạo thành công!' });
-      } else {
-        toast.error(response.data.message || 'Có lỗi xảy ra khi xử lý đơn hàng.');
-        setStatus({ type: 'error', msg: response.data.message || 'Có lỗi xảy ra khi xử lý đơn hàng.' });
+        fetchData();
+        fetchProfile();
       }
     } catch (err: any) {
-      toast.error(err.response?.data?.details || 'Không thể kết nối đến máy chủ.');
-      setStatus({ type: 'error', msg: err.response?.data?.details || 'Không thể kết nối đến máy chủ.' });
+      toast.error(err.response?.data?.error || 'Không thể xử lý đơn hàng.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleApproveTransaction = async (tx: Transaction) => {
-    if (!isAdmin) return;
-    setLoading(true);
-    try {
-      const userRef = doc(db, 'users', tx.userId);
-      const userSnap = await getDoc(userRef);
-      if (!userSnap.exists()) throw new Error('User not found');
-      
-      const currentBalance = userSnap.data().balance || 0;
-      const newBalance = currentBalance + tx.amount;
-
-      // Update User Balance
-      await updateDoc(userRef, { balance: newBalance });
-      
-      // Update Transaction Status
-      await updateDoc(doc(db, 'transactions', tx.id), { status: 'success' });
-      
-      toast.success('Đã phê duyệt giao dịch thành công!');
-    } catch (err: any) {
-      toast.error(err.message);
-    } finally {
-      setLoading(false);
-    }
+    toast.info('Tính năng phê duyệt thủ công đang được nâng cấp cho SQLite.');
   };
 
   const handleUpdateUserBalance = async (userId: string, newBalance: number) => {
-    if (!isAdmin) return;
     try {
-      await updateDoc(doc(db, 'users', userId), { balance: newBalance });
+      await api.post('/admin/user/update', { userId, balance: newBalance, discount: profile?.discount || 0, displayName: profile?.displayName || '' });
       toast.success('Cập nhật số dư thành công!');
+      fetchData();
     } catch (err: any) {
-      toast.error(err.message);
+      toast.error(err.response?.data?.error || err.message);
     }
   };
 
   const handleUpdateUserProfile = async (userId: string, data: Partial<UserProfile>) => {
-    if (!isAdmin) return;
     try {
-      await updateDoc(doc(db, 'users', userId), data);
+      const targetUser = allUsers.find(u => u.id === userId);
+      await api.post('/admin/user/update', { 
+        userId, 
+        balance: data.balance ?? targetUser?.balance ?? 0, 
+        discount: data.discount ?? targetUser?.discount ?? 0, 
+        displayName: data.displayName ?? targetUser?.displayName ?? '' 
+      });
       toast.success('Cập nhật thông tin người dùng thành công!');
       setIsEditUserModalOpen(false);
+      fetchData();
     } catch (err: any) {
-      toast.error(err.message);
+      toast.error(err.response?.data?.error || err.message);
     }
   };
 
   const handleUpdateSettings = async (newSettings: Partial<GlobalSettings>) => {
-    if (!isAdmin) return;
     try {
-      await setDoc(doc(db, 'settings', 'global'), { ...globalSettings, ...newSettings }, { merge: true });
+      await api.post('/admin/settings/update', { ...globalSettings, ...newSettings });
       toast.success('Cập nhật cài đặt thành công!');
+      fetchData();
     } catch (err: any) {
-      toast.error(err.message);
+      toast.error(err.response?.data?.error || err.message);
     }
   };
 
@@ -568,6 +453,22 @@ export default function App() {
           </div>
 
           <form onSubmit={handleAuth} className="space-y-4">
+            {authMode === 'register' && (
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tên hiển thị</label>
+                <div className="relative">
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <input 
+                    required
+                    type="text" 
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder="Nhập tên của bạn"
+                    className="w-full pl-11 pr-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:border-indigo-500 outline-none transition-all text-white"
+                  />
+                </div>
+              </div>
+            )}
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Email</label>
               <div className="relative">
@@ -689,10 +590,10 @@ export default function App() {
             <div className="flex items-center gap-3">
               <div className="text-right">
                 <div className="text-xs font-bold text-white">{profile?.displayName}</div>
-                <div className="text-[10px] text-slate-500">{user?.email}</div>
+                <div className="text-[10px] text-slate-500">{profile?.email}</div>
               </div>
               <button 
-                onClick={() => signOut(auth)}
+                onClick={handleLogout}
                 className="p-2.5 bg-white/5 hover:bg-rose-500/10 border border-white/10 hover:border-rose-500/20 rounded-xl text-slate-400 hover:text-rose-400 transition-all"
               >
                 <LogOut className="w-4 h-4" />
@@ -887,7 +788,7 @@ export default function App() {
                       { label: 'Ngân hàng', value: 'MB BANK (Quân Đội)', field: 'Ngân hàng' },
                       { label: 'Số tài khoản', value: '0813149999', field: 'Số tài khoản' },
                       { label: 'Chủ tài khoản', value: 'NGUYEN VAN A', field: 'Chủ tài khoản' },
-                      { label: 'Nội dung', value: `PROXY ${user?.email?.split('@')[0]}`, field: 'Nội dung' },
+                      { label: 'Nội dung', value: `PROXY ${profile?.email?.split('@')[0]}`, field: 'Nội dung' },
                     ].map((item, i) => (
                       <div key={i} className="flex flex-col sm:flex-row sm:items-center justify-between py-3 border-b border-white/5 gap-2">
                         <span className="text-sm text-slate-400">{item.label}:</span>
@@ -1226,11 +1127,11 @@ export default function App() {
                             </tr>
                           ) : (
                             filteredUsers.map((u) => (
-                              <tr key={u.uid} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                              <tr key={u.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                                 <td className="py-4 px-4">
                                   <div className="font-bold text-white">{u.displayName}</div>
                                   <div className="text-xs text-slate-500">{u.email}</div>
-                                  <div className="text-[10px] text-slate-600 font-mono mt-1">{u.uid}</div>
+                                  <div className="text-[10px] text-slate-600 font-mono mt-1">{u.id}</div>
                                 </td>
                                 <td className="py-4 px-4 font-bold text-indigo-400">
                                   {u.balance.toLocaleString('vi-VN')}đ
@@ -1512,7 +1413,7 @@ export default function App() {
                       const displayName = (document.getElementById('edit-displayName') as HTMLInputElement).value;
                       const balance = parseInt((document.getElementById('edit-balance') as HTMLInputElement).value) || 0;
                       const discount = parseInt((document.getElementById('edit-discount') as HTMLInputElement).value) || 0;
-                      handleUpdateUserProfile(editingUser.uid, { displayName, balance, discount });
+                      handleUpdateUserProfile(editingUser.id, { displayName, balance, discount });
                     }}
                     className="flex-1 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-all shadow-lg shadow-indigo-600/20"
                   >
