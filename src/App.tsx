@@ -357,6 +357,9 @@ export default function App() {
         case 'auth/too-many-requests':
           errorMessage = 'Tài khoản đã bị tạm khóa do đăng nhập sai nhiều lần. Vui lòng thử lại sau.';
           break;
+        case 'auth/operation-not-allowed':
+          errorMessage = 'Phương thức đăng nhập này chưa được bật trong Firebase Console.';
+          break;
         default:
           errorMessage = err.message || errorMessage;
       }
@@ -378,6 +381,8 @@ export default function App() {
         errorMessage = 'Cửa sổ đăng nhập đã bị đóng.';
       } else if (err.code === 'auth/cancelled-popup-request') {
         errorMessage = 'Yêu cầu đăng nhập đã bị hủy.';
+      } else if (err.code === 'auth/operation-not-allowed') {
+        errorMessage = 'Đăng nhập bằng Google chưa được bật trong Firebase Console.';
       }
       toast.error(errorMessage);
       setStatus({ type: 'error', msg: errorMessage });
