@@ -176,7 +176,22 @@ async function startServer() {
         return res.status(400).json({ error: "Insufficient balance" });
       }
 
-      const apiResponse = await axios.post("https://proxynuoinick.com/api/api/tasks/start", req.body);
+      const externalApiToken = process.env.EXTERNAL_PROXY_API_TOKEN || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1lIjoiMDM1NTY1NjczMCIsImlwIjoiMTcyLjcxLjIxNC4xNDciLCJleHAiOjE3NzI2NTg1ODl9.mx_Y_OiXQNxB7uuWieEnXRaODwCpKKKtuVYkpccyzJo';
+      
+      const apiResponse = await axios.post("https://proxynuoinick.com/api/api/tasks/start", {
+        userId: "0355656730",
+        numProxy: parseInt(numProxy),
+        passwordproxy: passwordproxy,
+        usernameproxy: usernameproxy,
+        tinhtrangproxy: tinhtrangproxy,
+        thoigianxoay: 0,
+        soNgay: parseInt(soNgay),
+        tenKhach: "0355656730"
+      }, {
+        headers: {
+          'Authorization': `Bearer ${externalApiToken}`
+        }
+      });
       
       if (apiResponse.data.status === 'success' || apiResponse.data.success) {
         db.transaction(() => {

@@ -1344,16 +1344,6 @@ export default function App() {
         </div>
         <div className="max-w-7xl mx-auto px-6 pt-12 mt-12 border-t border-white/5 flex flex-col sm:flex-row justify-between items-center gap-4">
           <p className="text-xs text-slate-600">© 2026 PROXYPRO. All rights reserved.</p>
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2 text-xs text-slate-600">
-              <ShieldCheck className="w-3 h-3" />
-              Verified Secure
-            </div>
-            <div className="flex items-center gap-2 text-xs text-slate-600">
-              <Zap className="w-3 h-3" />
-              Powered by AI
-            </div>
-          </div>
         </div>
       </footer>
 
