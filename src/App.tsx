@@ -139,6 +139,7 @@ export default function App() {
   const [showAnnouncementPopup, setShowAnnouncementPopup] = useState(false);
   const [lastAnnouncement, setLastAnnouncement] = useState('');
   const [selectedDepositAmount, setSelectedDepositAmount] = useState<number | null>(null);
+  const [customAmount, setCustomAmount] = useState<string>('');
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [isEditUserModalOpen, setIsEditUserModalOpen] = useState(false);
 
@@ -332,6 +333,10 @@ export default function App() {
   };
 
   const handleDeposit = async (amount: number) => {
+    if (amount < 5000) {
+      toast.error('Số tiền nạp tối thiểu là 5,000đ');
+      return;
+    }
     setSelectedDepositAmount(amount);
     setLoading(true);
     try {
@@ -780,7 +785,7 @@ export default function App() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="max-w-4xl mx-auto"
+              className="max-w-5xl mx-auto"
             >
               <div className="bg-[#121214] border border-white/10 rounded-[32px] p-8 lg:p-10 shadow-2xl">
                 <h2 className="text-2xl font-bold text-white mb-8 flex items-center gap-3">
@@ -788,88 +793,115 @@ export default function App() {
                   Nạp tiền vào tài khoản
                 </h2>
 
-                <div className="grid md:grid-cols-3 gap-6 mb-12">
+                <div className="grid md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
                   {[50000, 100000, 200000, 500000, 1000000, 2000000].map((amount) => (
                     <button
                       key={amount}
-                      onClick={() => handleDeposit(amount)}
-                      className="p-6 bg-white/5 border border-white/10 rounded-2xl hover:border-indigo-500 hover:bg-indigo-500/5 transition-all group text-center"
+                      onClick={() => {
+                        setCustomAmount(amount.toString());
+                        handleDeposit(amount);
+                      }}
+                      className={`p-4 border rounded-2xl transition-all group text-center ${selectedDepositAmount === amount ? 'border-indigo-500 bg-indigo-500/10' : 'bg-white/5 border-white/10 hover:border-indigo-500/50 hover:bg-indigo-500/5'}`}
                     >
-                      <div className="text-2xl font-black text-white mb-1 group-hover:text-indigo-400">
+                      <div className={`text-lg font-black mb-1 ${selectedDepositAmount === amount ? 'text-indigo-400' : 'text-white group-hover:text-indigo-400'}`}>
                         {amount.toLocaleString('vi-VN')}đ
                       </div>
-                      <div className="text-xs text-slate-500 font-bold uppercase tracking-widest">Chọn gói này</div>
+                      <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Chọn nhanh</div>
                     </button>
                   ))}
                 </div>
 
-                <div className="p-8 bg-indigo-600/10 border border-indigo-500/20 rounded-3xl relative overflow-hidden">
-                  <div className="absolute top-0 right-0 p-8 opacity-5">
-                    <CreditCard className="w-32 h-32" />
-                  </div>
-                  
-                  <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-                    <AlertCircle className="w-5 h-5 text-indigo-400" />
-                    Hướng dẫn chuyển khoản
-                  </h3>
-                  
-                  <div className="space-y-4 relative z-10">
-                    {[
-                      { label: 'Ngân hàng', value: 'MB BANK (Quân Đội)', field: 'Ngân hàng' },
-                      { label: 'Số tài khoản', value: '0355656730', field: 'Số tài khoản' },
-                      { label: 'Chủ tài khoản', value: 'NGUYEN GIA HUY', field: 'Chủ tài khoản' },
-                      { label: 'Nội dung', value: `NAP ${profile?.id?.substring(0, 8).toUpperCase()}`, field: 'Nội dung' },
-                    ].map((item, i) => (
-                      <div key={i} className="flex flex-col sm:flex-row sm:items-center justify-between py-3 border-b border-white/5 gap-2">
-                        <span className="text-sm text-slate-400">{item.label}:</span>
-                        <div className="flex items-center gap-3">
-                          <span className={`text-sm font-bold ${item.label === 'Nội dung' ? 'text-indigo-400 uppercase' : 'text-white'}`}>
-                            {item.value}
-                          </span>
-                          <button 
-                            onClick={() => copyToClipboard(item.value, item.field)}
-                            className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-slate-500 hover:text-white"
-                          >
-                            {copiedField === item.field ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <p className="text-xs text-slate-500 italic max-w-md">
-                      * Hệ thống sẽ tự động cộng tiền sau 1-3 phút kể từ khi nhận được tiền. Nếu quá 10 phút chưa thấy tiền, vui lòng liên hệ hỗ trợ.
-                    </p>
-                    <button 
-                      onClick={() => toast.info('Vui lòng thực hiện chuyển khoản trên ứng dụng ngân hàng của bạn. Hệ thống sẽ tự động cập nhật.')}
-                      className="px-6 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-sm font-bold text-white transition-all"
+                <div className="mb-12 max-w-2xl">
+                  <label className="block text-sm font-bold text-slate-400 mb-3 ml-1 uppercase tracking-wider">Nhập số tiền cần nạp</label>
+                  <div className="relative group">
+                    <input
+                      type="number"
+                      value={customAmount}
+                      onChange={(e) => setCustomAmount(e.target.value)}
+                      placeholder="Ví dụ: 50000"
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-white text-lg font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all placeholder:text-slate-600"
+                    />
+                    <button
+                      onClick={() => handleDeposit(parseInt(customAmount))}
+                      disabled={!customAmount || parseInt(customAmount) < 5000}
+                      className="absolute right-2 top-2 bottom-2 px-6 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:hover:bg-indigo-600 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-indigo-600/20"
                     >
-                      Tôi đã chuyển khoản
+                      Xác nhận nạp
                     </button>
                   </div>
+                  <p className="mt-2 text-xs text-slate-500 ml-2 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    Số tiền nạp tối thiểu là 5,000đ
+                  </p>
+                </div>
 
-                  {selectedDepositAmount && (
-                    <div className="mt-8 flex flex-col items-center gap-4 p-8 bg-white rounded-3xl shadow-2xl">
-                      <div className="text-center space-y-1">
-                        <p className="text-sm font-black text-slate-900 uppercase tracking-tight">Quét mã QR để thanh toán</p>
-                        <p className="text-2xl font-black text-indigo-600">{selectedDepositAmount.toLocaleString('vi-VN')}đ</p>
-                      </div>
-                      <div className="relative p-4 bg-slate-50 rounded-2xl border-2 border-slate-100">
-                        <img 
-                          src={`https://img.vietqr.io/image/MB-0355656730-compact2.png?amount=${selectedDepositAmount}&addInfo=PROXY%20${profile?.email?.split('@')[0]}&accountName=NGUYEN%20GIA%20HUY`}
-                          alt="VietQR"
-                          className="w-64 h-64 object-contain mix-blend-multiply"
-                          referrerPolicy="no-referrer"
-                        />
-                        <div className="absolute inset-0 border-2 border-indigo-500/20 rounded-2xl pointer-events-none" />
-                      </div>
-                      <div className="flex items-center gap-2 px-4 py-2 bg-indigo-50 rounded-full">
-                        <Zap className="w-3 h-3 text-indigo-600" />
-                        <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">Tự động cộng tiền sau khi quét</p>
-                      </div>
+                <div className="grid lg:grid-cols-2 gap-10 items-start">
+                  <div className="p-8 bg-indigo-600/10 border border-indigo-500/20 rounded-3xl relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-8 opacity-5">
+                      <CreditCard className="w-32 h-32" />
                     </div>
-                  )}
+                    
+                    <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+                      <AlertCircle className="w-5 h-5 text-indigo-400" />
+                      Thông tin chuyển khoản
+                    </h3>
+                    
+                    <div className="space-y-4 relative z-10">
+                      {[
+                        { label: 'Ngân hàng', value: 'MB BANK (Quân Đội)', field: 'Ngân hàng' },
+                        { label: 'Số tài khoản', value: '0355656730', field: 'Số tài khoản' },
+                        { label: 'Chủ tài khoản', value: 'NGUYEN GIA HUY', field: 'Chủ tài khoản' },
+                        { label: 'Số tiền', value: `${(selectedDepositAmount || parseInt(customAmount) || 0).toLocaleString('vi-VN')}đ`, field: 'Số tiền' },
+                        { label: 'Nội dung', value: `NAP ${profile?.id?.substring(0, 8).toUpperCase()}`, field: 'Nội dung' },
+                      ].map((item, i) => (
+                        <div key={i} className="flex flex-col sm:flex-row sm:items-center justify-between py-3 border-b border-white/5 gap-2">
+                          <span className="text-sm text-slate-400">{item.label}:</span>
+                          <div className="flex items-center gap-3">
+                            <span className={`text-sm font-bold ${item.label === 'Nội dung' ? 'text-indigo-400 uppercase' : 'text-white'}`}>
+                              {item.value}
+                            </span>
+                            <button 
+                              onClick={() => copyToClipboard(item.value, item.field)}
+                              className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-slate-500 hover:text-white"
+                            >
+                              {copiedField === item.field ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-8">
+                      <p className="text-xs text-slate-500 italic leading-relaxed">
+                        * Hệ thống sẽ tự động cộng tiền sau 1-3 phút kể từ khi nhận được tiền. Nếu quá 10 phút chưa thấy tiền, vui lòng liên hệ hỗ trợ.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col items-center justify-center p-8 bg-white/5 border border-white/10 rounded-3xl">
+                    <div className="text-center mb-6">
+                      <h3 className="text-lg font-bold text-white mb-2">Quét mã QR để nạp nhanh</h3>
+                      <p className="text-xs text-slate-400">Mở ứng dụng ngân hàng và quét mã dưới đây</p>
+                    </div>
+                    
+                    <div className="relative p-6 bg-white rounded-3xl shadow-2xl shadow-indigo-500/20">
+                      <img 
+                        src={`https://img.vietqr.io/image/MB-0355656730-compact2.png?amount=${selectedDepositAmount || parseInt(customAmount) || 0}&addInfo=NAP%20${profile?.id?.substring(0, 8).toUpperCase()}&accountName=NGUYEN%20GIA%20HUY`}
+                        alt="QR Code Nạp Tiền"
+                        className="w-64 h-64 object-contain"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute inset-0 border-2 border-indigo-500/20 rounded-3xl pointer-events-none"></div>
+                    </div>
+
+                    <div className="mt-8 flex flex-col items-center gap-3">
+                      <div className="flex items-center gap-2 px-4 py-2 bg-indigo-500/10 rounded-full border border-indigo-500/20">
+                        <RefreshCw className="w-3 h-3 text-indigo-400 animate-spin-slow" />
+                        <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Đang chờ thanh toán...</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 text-center uppercase tracking-widest font-bold">Vui lòng không thay đổi nội dung chuyển khoản</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </motion.div>
