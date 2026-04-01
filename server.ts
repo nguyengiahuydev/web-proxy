@@ -135,6 +135,21 @@ async function startServer() {
   const BANK_PASSWORD = process.env.BANK_PASSWORD || "Giahuy@123";
   const BANK_ACCOUNT = process.env.BANK_ACCOUNT || "0355656730";
   const BANK_TOKEN = process.env.BANK_TOKEN || "48E1EDB4-347A-24C0-A43B-43B5201CF8E3";
+  const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+  const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+
+  const sendTelegramMessage = async (message: string) => {
+    if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) return;
+    try {
+      await axios.post(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        chat_id: TELEGRAM_CHAT_ID,
+        text: message,
+        parse_mode: 'HTML'
+      });
+    } catch (error: any) {
+      console.error("Telegram Error:", error.message);
+    }
+  };
 
   const checkBankHistory = async () => {
     try {
@@ -157,10 +172,19 @@ async function startServer() {
                   db.transaction(() => {
                     const txId = uuidv4();
                     db.prepare('INSERT INTO transactions (id, userId, amount, type, status, description) VALUES (?, ?, ?, ?, ?, ?)')
-                      .run(txId, user.id, amount, 'deposit', 'success', `Nạp tiền tự động (Bank): ${amount.toLocaleString()}đ - Ref: ${tx.refNo}`);
+                      .run(txId, user.id, amount, 'deposit', 'success', `Nạp tiền tự động (Bank): ${amount.toLocaleString()}đ - Ref: ${tx.refNo} - Nội dung: ${description}`);
                     db.prepare('UPDATE users SET balance = balance + ? WHERE id = ?').run(amount, user.id);
                   })();
                   console.log(`Auto-approved deposit for user ${user.id}: ${amount}đ`);
+                  
+                  // Send Telegram notification
+                  const telegramMsg = `<b>💰 NẠP TIỀN THÀNH CÔNG</b>\n\n` +
+                    `👤 User ID: <code>${user.id}</code>\n` +
+                    `💵 Số tiền: <b>${amount.toLocaleString()}đ</b>\n` +
+                    `📝 Nội dung: <code>${description}</code>\n` +
+                    `🆔 Ref: <code>${tx.refNo}</code>\n` +
+                    `⏰ Thời gian: ${new Date().toLocaleString('vi-VN')}`;
+                  sendTelegramMessage(telegramMsg);
                 }
               }
             }

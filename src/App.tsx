@@ -39,7 +39,8 @@ import {
   Megaphone,
   Phone,
   SendHorizontal,
-  Search
+  Search,
+  QrCode
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import axios from 'axios';
@@ -140,6 +141,7 @@ export default function App() {
   const [lastAnnouncement, setLastAnnouncement] = useState('');
   const [selectedDepositAmount, setSelectedDepositAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState<string>('');
+  const [showQR, setShowQR] = useState(false);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [isEditUserModalOpen, setIsEditUserModalOpen] = useState(false);
 
@@ -338,6 +340,7 @@ export default function App() {
       return;
     }
     setSelectedDepositAmount(amount);
+    setShowQR(true);
     setLoading(true);
     try {
       await api.post('/deposit', { amount });
@@ -862,36 +865,13 @@ export default function App() {
                             </span>
                             <button 
                               onClick={() => copyToClipboard(item.value, item.field)}
-                              className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-slate-500 hover:text-white"
+                              className="p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-colors"
                             >
-                              {copiedField === item.field ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                              <Copy className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         </div>
                       ))}
-                    </div>
-
-                    <div className="mt-8">
-                      <p className="text-xs text-slate-500 italic leading-relaxed">
-                        * Hệ thống sẽ tự động cộng tiền sau 1-3 phút kể từ khi nhận được tiền. Nếu quá 10 phút chưa thấy tiền, vui lòng liên hệ hỗ trợ.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col items-center justify-center p-8 bg-white/5 border border-white/10 rounded-3xl">
-                    <div className="text-center mb-6">
-                      <h3 className="text-lg font-bold text-white mb-2">Quét mã QR để nạp nhanh</h3>
-                      <p className="text-xs text-slate-400">Mở ứng dụng ngân hàng và quét mã dưới đây</p>
-                    </div>
-                    
-                    <div className="relative p-6 bg-white rounded-3xl shadow-2xl shadow-indigo-500/20">
-                      <img 
-                        src={`https://img.vietqr.io/image/MB-0355656730-compact2.png?amount=${selectedDepositAmount || parseInt(customAmount) || 0}&addInfo=NAP%20${profile?.id?.substring(0, 8).toUpperCase()}&accountName=NGUYEN%20GIA%20HUY`}
-                        alt="QR Code Nạp Tiền"
-                        className="w-64 h-64 object-contain"
-                        referrerPolicy="no-referrer"
-                      />
-                      <div className="absolute inset-0 border-2 border-indigo-500/20 rounded-3xl pointer-events-none"></div>
                     </div>
 
                     <div className="mt-8 flex flex-col items-center gap-3">
@@ -901,6 +881,50 @@ export default function App() {
                       </div>
                       <p className="text-[10px] text-slate-500 text-center uppercase tracking-widest font-bold">Vui lòng không thay đổi nội dung chuyển khoản</p>
                     </div>
+                    <div className="absolute inset-0 border-2 border-indigo-500/20 rounded-3xl pointer-events-none"></div>
+                  </div>
+
+                  <div className="flex flex-col items-center justify-center p-8 bg-white/5 border border-white/10 rounded-3xl min-h-[400px]">
+                    {showQR ? (
+                      <>
+                        <div className="text-center mb-6">
+                          <h3 className="text-lg font-bold text-white mb-2">Quét mã QR để nạp nhanh</h3>
+                          <p className="text-xs text-slate-400">Mở ứng dụng ngân hàng và quét mã dưới đây</p>
+                        </div>
+                        
+                        <div className="relative p-6 bg-white rounded-3xl shadow-2xl shadow-indigo-500/20">
+                          <img 
+                            src={`https://img.vietqr.io/image/MB-0355656730-compact2.png?amount=${selectedDepositAmount || parseInt(customAmount) || 0}&addInfo=NAP%20${profile?.id?.substring(0, 8).toUpperCase()}&accountName=NGUYEN%20GIA%20HUY`}
+                            alt="QR Code Nạp Tiền"
+                            className="w-64 h-64 object-contain"
+                            referrerPolicy="no-referrer"
+                          />
+                          <div className="absolute inset-0 border-2 border-indigo-500/20 rounded-2xl pointer-events-none"></div>
+                        </div>
+
+                        <div className="mt-8 flex flex-col items-center gap-3">
+                          <div className="flex items-center gap-2 px-4 py-2 bg-indigo-500/10 rounded-full border border-indigo-500/20">
+                            <RefreshCw className="w-3 h-3 text-indigo-400 animate-spin-slow" />
+                            <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Đang chờ thanh toán...</span>
+                          </div>
+                          <p className="text-[10px] text-slate-500 text-center uppercase tracking-widest font-bold">Vui lòng không thay đổi nội dung chuyển khoản</p>
+                          <button 
+                            onClick={() => setShowQR(false)}
+                            className="text-[10px] text-indigo-400 hover:underline font-bold uppercase tracking-widest mt-2"
+                          >
+                            Thay đổi số tiền
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-center p-10">
+                        <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6">
+                          <QrCode className="w-10 h-10 text-slate-600" />
+                        </div>
+                        <h3 className="text-lg font-bold text-white mb-2">Chưa có mã QR</h3>
+                        <p className="text-sm text-slate-500 max-w-[200px] mx-auto">Chọn gói nạp hoặc nhập số tiền và nhấn "Xác nhận nạp" để hiển thị mã QR thanh toán.</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -995,6 +1019,7 @@ export default function App() {
                       <tr className="text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-white/5">
                         <th className="pb-4 px-4">Thời gian</th>
                         <th className="pb-4 px-4">Loại</th>
+                        <th className="pb-4 px-4">Mã giao dịch</th>
                         <th className="pb-4 px-4">Số tiền</th>
                         <th className="pb-4 px-4">Trạng thái</th>
                         <th className="pb-4 px-4">Mô tả</th>
@@ -1003,7 +1028,7 @@ export default function App() {
                     <tbody className="text-sm">
                       {transactions.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="py-12 text-center text-slate-500 italic">
+                          <td colSpan={6} className="py-12 text-center text-slate-500 italic">
                             Chưa có giao dịch nào được ghi lại.
                           </td>
                         </tr>
@@ -1019,6 +1044,9 @@ export default function App() {
                               }`}>
                                 {tx.type === 'deposit' ? 'Nạp tiền' : 'Mua Proxy'}
                               </span>
+                            </td>
+                            <td className="py-4 px-4 font-mono text-[10px] text-slate-400">
+                              {tx.type === 'deposit' ? `NAP ${profile?.id?.substring(0, 8).toUpperCase()}` : tx.id.substring(0, 8).toUpperCase()}
                             </td>
                             <td className={`py-4 px-4 font-bold ${tx.amount > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                               {tx.amount > 0 ? '+' : ''}{(tx.amount || 0).toLocaleString('vi-VN')}đ
@@ -1136,6 +1164,7 @@ export default function App() {
                           <tr className="text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-white/5">
                             <th className="pb-4 px-4">Thời gian</th>
                             <th className="pb-4 px-4">User ID</th>
+                            <th className="pb-4 px-4">Mã giao dịch</th>
                             <th className="pb-4 px-4">Số tiền</th>
                             <th className="pb-4 px-4">Mô tả</th>
                             <th className="pb-4 px-4">Hành động</th>
@@ -1144,7 +1173,7 @@ export default function App() {
                         <tbody className="text-sm">
                           {filteredTransactions.length === 0 ? (
                             <tr>
-                              <td colSpan={5} className="py-12 text-center text-slate-500 italic">
+                              <td colSpan={6} className="py-12 text-center text-slate-500 italic">
                                 Không có giao dịch nào khớp với tìm kiếm.
                               </td>
                             </tr>
@@ -1155,6 +1184,9 @@ export default function App() {
                                   {tx.createdAt ? new Date(tx.createdAt).toLocaleString('vi-VN') : ''}
                                 </td>
                                 <td className="py-4 px-4 text-slate-400 font-mono text-xs truncate max-w-[150px]">{tx.userId}</td>
+                                <td className="py-4 px-4 font-mono text-[10px] text-slate-400">
+                                  {tx.type === 'deposit' ? `NAP ${tx.userId.substring(0, 8).toUpperCase()}` : tx.id.substring(0, 8).toUpperCase()}
+                                </td>
                                 <td className={`py-4 px-4 font-bold ${tx.amount > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                                   {tx.amount > 0 ? '+' : ''}{(tx.amount || 0).toLocaleString('vi-VN')}đ
                                 </td>
