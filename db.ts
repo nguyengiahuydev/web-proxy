@@ -51,5 +51,9 @@ db.exec(`
 const seedSettings = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
 seedSettings.run('priceMarkup', '0');
 seedSettings.run('announcement', 'Chào mừng bạn đến với hệ thống Proxy chất lượng cao!');
+seedSettings.run('showAnnouncement', 'false');
+seedSettings.run('contactEmail', 'support@proxypro.vn');
+seedSettings.run('contactTelegram', '@proxypro_support');
+seedSettings.run('contactPhone', '0123456789');
 
 export default db;

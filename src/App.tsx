@@ -116,6 +116,7 @@ export default function App() {
   const [showPassword, setShowPassword] = useState(false);
   const [activeTab, setActiveTab] = useState<'order' | 'deposit' | 'history' | 'admin'>('order');
   const [adminSubTab, setAdminSubTab] = useState<'dashboard' | 'transactions' | 'users' | 'settings'>('dashboard');
+  const [localSettings, setLocalSettings] = useState<GlobalSettings | null>(null);
   const [userSearch, setUserSearch] = useState('');
   const [stats, setStats] = useState({
     totalUsers: 0,
@@ -128,6 +129,8 @@ export default function App() {
   const [txFilter, setTxFilter] = useState<'all' | 'deposit' | 'purchase'>('all');
   const [allProxies, setAllProxies] = useState<any[]>([]);
   const [showAnnouncementPopup, setShowAnnouncementPopup] = useState(false);
+  const [lastAnnouncement, setLastAnnouncement] = useState('');
+  const [selectedDepositAmount, setSelectedDepositAmount] = useState<number | null>(null);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [isEditUserModalOpen, setIsEditUserModalOpen] = useState(false);
 
@@ -188,9 +191,11 @@ export default function App() {
       setTransactions(txRes.data);
       setAllProxies(proxyRes.data);
       setGlobalSettings(settingsRes.data);
+      if (!localSettings) setLocalSettings(settingsRes.data);
       
-      if (settingsRes.data.announcement) {
+      if (settingsRes.data.announcement && settingsRes.data.showAnnouncement && settingsRes.data.announcement !== lastAnnouncement) {
         setShowAnnouncementPopup(true);
+        setLastAnnouncement(settingsRes.data.announcement);
       }
 
       if (profile?.role === 'admin') {
@@ -303,6 +308,7 @@ export default function App() {
   };
 
   const handleDeposit = async (amount: number) => {
+    setSelectedDepositAmount(amount);
     setLoading(true);
     try {
       await api.post('/deposit', { amount });
@@ -786,8 +792,8 @@ export default function App() {
                   <div className="space-y-4 relative z-10">
                     {[
                       { label: 'Ngân hàng', value: 'MB BANK (Quân Đội)', field: 'Ngân hàng' },
-                      { label: 'Số tài khoản', value: '0813149999', field: 'Số tài khoản' },
-                      { label: 'Chủ tài khoản', value: 'NGUYEN VAN A', field: 'Chủ tài khoản' },
+                      { label: 'Số tài khoản', value: '0355656730', field: 'Số tài khoản' },
+                      { label: 'Chủ tài khoản', value: 'NGUYEN GIA HUY', field: 'Chủ tài khoản' },
                       { label: 'Nội dung', value: `PROXY ${profile?.email?.split('@')[0]}`, field: 'Nội dung' },
                     ].map((item, i) => (
                       <div key={i} className="flex flex-col sm:flex-row sm:items-center justify-between py-3 border-b border-white/5 gap-2">
@@ -818,6 +824,28 @@ export default function App() {
                       Tôi đã chuyển khoản
                     </button>
                   </div>
+
+                  {selectedDepositAmount && (
+                    <div className="mt-8 flex flex-col items-center gap-4 p-8 bg-white rounded-3xl shadow-2xl">
+                      <div className="text-center space-y-1">
+                        <p className="text-sm font-black text-slate-900 uppercase tracking-tight">Quét mã QR để thanh toán</p>
+                        <p className="text-2xl font-black text-indigo-600">{selectedDepositAmount.toLocaleString('vi-VN')}đ</p>
+                      </div>
+                      <div className="relative p-4 bg-slate-50 rounded-2xl border-2 border-slate-100">
+                        <img 
+                          src={`https://img.vietqr.io/image/MB-0355656730-compact2.png?amount=${selectedDepositAmount}&addInfo=PROXY%20${profile?.email?.split('@')[0]}&accountName=NGUYEN%20GIA%20HUY`}
+                          alt="VietQR"
+                          className="w-64 h-64 object-contain mix-blend-multiply"
+                          referrerPolicy="no-referrer"
+                        />
+                        <div className="absolute inset-0 border-2 border-indigo-500/20 rounded-2xl pointer-events-none" />
+                      </div>
+                      <div className="flex items-center gap-2 px-4 py-2 bg-indigo-50 rounded-full">
+                        <Zap className="w-3 h-3 text-indigo-600" />
+                        <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">Tự động cộng tiền sau khi quét</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </motion.div>
@@ -1161,16 +1189,16 @@ export default function App() {
                   </div>
                 )}
 
-                {adminSubTab === 'settings' && (
+                {adminSubTab === 'settings' && localSettings && (
                   <div className="space-y-8 max-w-2xl">
                     <div className="grid sm:grid-cols-2 gap-6">
                       <div className="space-y-2">
                         <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tăng giá (%)</label>
                         <input 
                           type="number" 
-                          value={globalSettings.priceMarkup} 
-                          onChange={(e) => handleUpdateSettings({ priceMarkup: parseInt(e.target.value) || 0 })}
-                          className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:border-indigo-500 outline-none transition-all text-white" 
+                          value={localSettings.priceMarkup} 
+                          onChange={(e) => setLocalSettings({ ...localSettings, priceMarkup: parseFloat(e.target.value) || 0 })}
+                          className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:border-indigo-500 outline-none transition-all text-white text-sm" 
                         />
                         <p className="text-[10px] text-slate-500 italic">* Giá bán = Giá gốc + (Giá gốc * % tăng)</p>
                       </div>
@@ -1178,12 +1206,12 @@ export default function App() {
                         <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Hiện thông báo</label>
                         <div className="flex items-center gap-3 h-[50px]">
                           <button 
-                            onClick={() => handleUpdateSettings({ showAnnouncement: !globalSettings.showAnnouncement })}
-                            className={`w-12 h-6 rounded-full transition-all relative ${globalSettings.showAnnouncement ? 'bg-indigo-600' : 'bg-white/10'}`}
+                            onClick={() => setLocalSettings({ ...localSettings, showAnnouncement: !localSettings.showAnnouncement })}
+                            className={`w-12 h-6 rounded-full transition-all relative ${localSettings.showAnnouncement ? 'bg-indigo-600' : 'bg-white/10'}`}
                           >
-                            <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${globalSettings.showAnnouncement ? 'left-7' : 'left-1'}`} />
+                            <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${localSettings.showAnnouncement ? 'left-7' : 'left-1'}`} />
                           </button>
-                          <span className="text-sm font-medium text-slate-400">{globalSettings.showAnnouncement ? 'Đang bật' : 'Đang tắt'}</span>
+                          <span className="text-sm font-medium text-slate-400">{localSettings.showAnnouncement ? 'Đang bật' : 'Đang tắt'}</span>
                         </div>
                       </div>
                     </div>
@@ -1191,8 +1219,8 @@ export default function App() {
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nội dung thông báo</label>
                       <textarea 
-                        value={globalSettings.announcement} 
-                        onChange={(e) => handleUpdateSettings({ announcement: e.target.value })}
+                        value={localSettings.announcement} 
+                        onChange={(e) => setLocalSettings({ ...localSettings, announcement: e.target.value })}
                         rows={3}
                         className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:border-indigo-500 outline-none transition-all text-white resize-none"
                         placeholder="Nhập nội dung thông báo cho khách hàng..."
@@ -1204,8 +1232,8 @@ export default function App() {
                         <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Email liên hệ</label>
                         <input 
                           type="email" 
-                          value={globalSettings.contactEmail} 
-                          onChange={(e) => handleUpdateSettings({ contactEmail: e.target.value })}
+                          value={localSettings.contactEmail} 
+                          onChange={(e) => setLocalSettings({ ...localSettings, contactEmail: e.target.value })}
                           className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:border-indigo-500 outline-none transition-all text-white text-sm" 
                         />
                       </div>
@@ -1213,8 +1241,8 @@ export default function App() {
                         <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Telegram</label>
                         <input 
                           type="text" 
-                          value={globalSettings.contactTelegram} 
-                          onChange={(e) => handleUpdateSettings({ contactTelegram: e.target.value })}
+                          value={localSettings.contactTelegram} 
+                          onChange={(e) => setLocalSettings({ ...localSettings, contactTelegram: e.target.value })}
                           className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:border-indigo-500 outline-none transition-all text-white text-sm" 
                         />
                       </div>
@@ -1222,11 +1250,22 @@ export default function App() {
                         <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Số điện thoại</label>
                         <input 
                           type="text" 
-                          value={globalSettings.contactPhone} 
-                          onChange={(e) => handleUpdateSettings({ contactPhone: e.target.value })}
+                          value={localSettings.contactPhone} 
+                          onChange={(e) => setLocalSettings({ ...localSettings, contactPhone: e.target.value })}
                           className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:border-indigo-500 outline-none transition-all text-white text-sm" 
                         />
                       </div>
+                    </div>
+
+                    <div className="pt-4 border-t border-white/5 flex justify-end">
+                      <button 
+                        onClick={() => handleUpdateSettings(localSettings)}
+                        disabled={loading}
+                        className="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl font-bold transition-all shadow-lg shadow-indigo-600/20 flex items-center gap-2"
+                      >
+                        {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                        Lưu cấu hình
+                      </button>
                     </div>
                   </div>
                 )}

@@ -87,7 +87,11 @@ async function startServer() {
   app.get("/api/settings", (req, res) => {
     const settings = db.prepare('SELECT * FROM settings').all();
     const settingsMap = settings.reduce((acc: any, curr: any) => {
-      acc[curr.key] = curr.value;
+      let val = curr.value;
+      if (val === 'true') val = true;
+      else if (val === 'false') val = false;
+      else if (curr.key === 'priceMarkup') val = parseFloat(val) || 0;
+      acc[curr.key] = val;
       return acc;
     }, {});
     res.json(settingsMap);
@@ -113,10 +117,12 @@ async function startServer() {
 
   app.post("/api/admin/settings/update", authenticateToken, (req: any, res) => {
     if (req.user.role !== 'admin') return res.sendStatus(403);
-    const { priceMarkup, announcement } = req.body;
+    const updates = req.body;
     try {
-      db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(priceMarkup.toString(), 'priceMarkup');
-      db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(announcement, 'announcement');
+      const updateStmt = db.prepare('UPDATE settings SET value = ? WHERE key = ?');
+      for (const [key, value] of Object.entries(updates)) {
+        updateStmt.run(value?.toString(), key);
+      }
       res.json({ status: "success" });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
