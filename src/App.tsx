@@ -346,7 +346,16 @@ export default function App() {
   };
 
   const handleApproveTransaction = async (tx: Transaction) => {
-    toast.info('Tính năng phê duyệt thủ công đang được nâng cấp cho SQLite.');
+    try {
+      setLoading(true);
+      await api.post('/admin/transaction/approve', { transactionId: tx.id });
+      toast.success('Phê duyệt giao dịch thành công!');
+      fetchData();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleUpdateUserBalance = async (userId: string, newBalance: number) => {
@@ -907,8 +916,8 @@ export default function App() {
                             <td className="py-4 px-4 text-slate-400">{p.username}</td>
                             <td className="py-4 px-4 text-slate-400">••••••••</td>
                             <td className="py-4 px-4">
-                              <div className="text-xs text-slate-300 font-bold">{p.expiresAt?.toDate().toLocaleDateString('vi-VN')}</div>
-                              <div className="text-[10px] text-slate-500">{p.expiresAt?.toDate().toLocaleTimeString('vi-VN')}</div>
+                              <div className="text-xs text-slate-300 font-bold">{p.expiresAt ? new Date(p.expiresAt).toLocaleDateString('vi-VN') : ''}</div>
+                              <div className="text-[10px] text-slate-500">{p.expiresAt ? new Date(p.expiresAt).toLocaleTimeString('vi-VN') : ''}</div>
                             </td>
                             <td className="py-4 px-4">
                               <button 
@@ -955,7 +964,7 @@ export default function App() {
                         transactions.map((tx) => (
                           <tr key={tx.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                             <td className="py-4 px-4 text-slate-400">
-                              {tx.createdAt?.toDate().toLocaleString('vi-VN')}
+                              {tx.createdAt ? new Date(tx.createdAt).toLocaleString('vi-VN') : ''}
                             </td>
                             <td className="py-4 px-4">
                               <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase ${
@@ -1096,7 +1105,7 @@ export default function App() {
                             filteredTransactions.map((tx) => (
                               <tr key={tx.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                                 <td className="py-4 px-4 text-slate-400 text-xs">
-                                  {tx.createdAt?.toDate().toLocaleString('vi-VN')}
+                                  {tx.createdAt ? new Date(tx.createdAt).toLocaleString('vi-VN') : ''}
                                 </td>
                                 <td className="py-4 px-4 text-slate-400 font-mono text-xs truncate max-w-[150px]">{tx.userId}</td>
                                 <td className={`py-4 px-4 font-bold ${tx.amount > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
@@ -1167,7 +1176,7 @@ export default function App() {
                                     <div className="text-[10px] text-emerald-400 font-bold">Giảm giá: {u.discount}%</div>
                                   )}
                                 </td>
-                                <td className="py-4 px-4 text-slate-500 text-xs">{u.createdAt?.toDate().toLocaleDateString('vi-VN')}</td>
+                                <td className="py-4 px-4 text-slate-500 text-xs">{u.createdAt ? new Date(u.createdAt).toLocaleDateString('vi-VN') : ''}</td>
                                 <td className="py-4 px-4">
                                   <button 
                                     onClick={() => {
