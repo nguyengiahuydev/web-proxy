@@ -129,15 +129,36 @@ async function startServer() {
     }
   });
 
-  // Deposit (Mock)
+  app.post("/api/admin/transaction/approve", authenticateToken, (req: any, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+    const { transactionId } = req.body;
+    try {
+      db.transaction(() => {
+        const tx: any = db.prepare('SELECT * FROM transactions WHERE id = ?').get(transactionId);
+        if (!tx || tx.status !== 'pending') {
+          throw new Error("Transaction not found or already processed");
+        }
+        
+        // Update transaction status
+        db.prepare('UPDATE transactions SET status = ? WHERE id = ?').run('success', transactionId);
+        
+        // If it was a deposit, update user balance
+        if (tx.type === 'deposit') {
+          db.prepare('UPDATE users SET balance = balance + ? WHERE id = ?').run(tx.amount, tx.userId);
+        }
+      })();
+      res.json({ status: "success" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Deposit (Request)
   app.post("/api/deposit", authenticateToken, (req: any, res) => {
     const { amount } = req.body;
     try {
-      db.transaction(() => {
-        db.prepare('UPDATE users SET balance = balance + ? WHERE id = ?').run(amount, req.user.id);
-        db.prepare('INSERT INTO transactions (id, userId, amount, type, status, description) VALUES (?, ?, ?, ?, ?, ?)')
-          .run(uuidv4(), req.user.id, amount, 'deposit', 'success', `Nạp tiền qua hệ thống: ${amount.toLocaleString()}đ`);
-      })();
+      db.prepare('INSERT INTO transactions (id, userId, amount, type, status, description) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(uuidv4(), req.user.id, amount, 'deposit', 'pending', `Yêu cầu nạp tiền: ${amount.toLocaleString()}đ`);
       res.json({ status: "success" });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
