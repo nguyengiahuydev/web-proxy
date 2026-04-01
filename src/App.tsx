@@ -625,7 +625,7 @@ export default function App() {
             <div className="flex items-center gap-3 px-4 py-2 bg-white/5 border border-white/10 rounded-full">
               <Wallet className="w-4 h-4 text-indigo-500" />
               <span className="text-sm font-bold text-white">
-                {profile?.balance.toLocaleString('vi-VN')}đ
+                {(profile?.balance || 0).toLocaleString('vi-VN')}đ
               </span>
               <button 
                 onClick={() => setActiveTab('deposit')}
@@ -1021,7 +1021,7 @@ export default function App() {
                               </span>
                             </td>
                             <td className={`py-4 px-4 font-bold ${tx.amount > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                              {tx.amount > 0 ? '+' : ''}{tx.amount.toLocaleString('vi-VN')}đ
+                              {tx.amount > 0 ? '+' : ''}{(tx.amount || 0).toLocaleString('vi-VN')}đ
                             </td>
                             <td className="py-4 px-4">
                               <span className={`flex items-center gap-1.5 text-xs font-medium ${
@@ -1086,7 +1086,7 @@ export default function App() {
                   <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
                     {[
                       { label: 'Tổng người dùng', value: stats.totalUsers, icon: User, color: 'text-blue-400' },
-                      { label: 'Tổng số dư (VND)', value: stats.totalBalance.toLocaleString('vi-VN'), icon: Wallet, color: 'text-emerald-400' },
+                      { label: 'Tổng số dư (VND)', value: (stats.totalBalance || 0).toLocaleString('vi-VN'), icon: Wallet, color: 'text-emerald-400' },
                       { label: 'Nạp tiền chờ duyệt', value: stats.pendingDeposits, icon: Clock, color: 'text-amber-400' },
                       { label: 'Tổng đơn hàng', value: stats.totalPurchases, icon: ShoppingCart, color: 'text-indigo-400' },
                     ].map((item, i) => (
@@ -1156,7 +1156,7 @@ export default function App() {
                                 </td>
                                 <td className="py-4 px-4 text-slate-400 font-mono text-xs truncate max-w-[150px]">{tx.userId}</td>
                                 <td className={`py-4 px-4 font-bold ${tx.amount > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                  {tx.amount > 0 ? '+' : ''}{tx.amount.toLocaleString('vi-VN')}đ
+                                  {tx.amount > 0 ? '+' : ''}{(tx.amount || 0).toLocaleString('vi-VN')}đ
                                 </td>
                                 <td className="py-4 px-4 text-slate-500 text-xs max-w-xs truncate">{tx.description}</td>
                                 <td className="py-4 px-4">
@@ -1218,7 +1218,7 @@ export default function App() {
                                   <div className="text-[10px] text-slate-600 font-mono mt-1">{u.id}</div>
                                 </td>
                                 <td className="py-4 px-4 font-bold text-indigo-400">
-                                  {u.balance.toLocaleString('vi-VN')}đ
+                                  {(u.balance || 0).toLocaleString('vi-VN')}đ
                                   {u.discount && u.discount > 0 && (
                                     <div className="text-[10px] text-emerald-400 font-bold">Giảm giá: {u.discount}%</div>
                                   )}
