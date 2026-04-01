@@ -337,8 +337,32 @@ export default function App() {
         toast.success('Đăng nhập thành công!');
       }
     } catch (err: any) {
-      toast.error(err.message);
-      setStatus({ type: 'error', msg: err.message });
+      let errorMessage = 'Đã có lỗi xảy ra. Vui lòng thử lại.';
+      
+      switch (err.code) {
+        case 'auth/email-already-in-use':
+          errorMessage = 'Email này đã được sử dụng bởi một tài khoản khác.';
+          break;
+        case 'auth/invalid-email':
+          errorMessage = 'Địa chỉ email không hợp lệ.';
+          break;
+        case 'auth/weak-password':
+          errorMessage = 'Mật khẩu quá yếu (tối thiểu 6 ký tự).';
+          break;
+        case 'auth/user-not-found':
+        case 'auth/wrong-password':
+        case 'auth/invalid-credential':
+          errorMessage = 'Email hoặc mật khẩu không chính xác.';
+          break;
+        case 'auth/too-many-requests':
+          errorMessage = 'Tài khoản đã bị tạm khóa do đăng nhập sai nhiều lần. Vui lòng thử lại sau.';
+          break;
+        default:
+          errorMessage = err.message || errorMessage;
+      }
+
+      toast.error(errorMessage);
+      setStatus({ type: 'error', msg: errorMessage });
     } finally {
       setLoading(false);
     }
@@ -349,8 +373,14 @@ export default function App() {
       await signInWithPopup(auth, new GoogleAuthProvider());
       toast.success('Đăng nhập bằng Google thành công!');
     } catch (err: any) {
-      toast.error(err.message);
-      setStatus({ type: 'error', msg: err.message });
+      let errorMessage = 'Đã có lỗi xảy ra khi đăng nhập bằng Google.';
+      if (err.code === 'auth/popup-closed-by-user') {
+        errorMessage = 'Cửa sổ đăng nhập đã bị đóng.';
+      } else if (err.code === 'auth/cancelled-popup-request') {
+        errorMessage = 'Yêu cầu đăng nhập đã bị hủy.';
+      }
+      toast.error(errorMessage);
+      setStatus({ type: 'error', msg: errorMessage });
     }
   };
 
